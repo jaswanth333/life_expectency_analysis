@@ -1,0 +1,562 @@
+---
+title: "Draft 1"
+author: "Mehrdad Ghyabi, Sai Jaswanth Kunku, Sagar Goswami"
+date: "12/7/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Initiation
+
+```{r}
+rm(list=ls()) # Dumping memory
+```
+
+## Importing Required Libraries
+
+```{r}
+library(tidyverse)
+library(ggfortify)
+library(ggplot2)
+library(psych)
+```
+
+## Importing Database Files
+
+```{r}
+df <- read.csv(file = "Life_Expectancy_Data_cleaned.csv")
+
+df <- df[,-c(1,6,7,9,10,11,12,13,18)]
+
+df$Status <- as.factor(df$Status)
+```
+
+------------------------------------------------------------------------
+
+## About the Database
+
+-   <div>
+
+    > -   Country- Country
+    >
+    > -   Year- Year
+    >
+    > -   Status- Developed or Developing status
+    >
+    > -   Life Expectancy- Age(years)
+    >
+    > -   ~~Adult Mortality- Adult Mortality Rates of both sexes(probability of dying between 15&60 years per 1000 population)~~
+    >
+    > -   ~~Infant Deaths- Number of Infant Deaths per 1000 population~~
+    >
+    > -   Alcohol- Alcohol, recorded per capita (15+) consumption (in litres of pure alcohol)
+    >
+    > -   ~~Percent Expenditure- Expenditure on health as a percentage of Gross Domestic Product per capita(%)~~
+    >
+    > -   ~~Hep B- Hepatitis B (HepB) immunization coverage among 1-year-olds(%)~~
+    >
+    > -   ~~Measles- number of reported measles cases per 1000 population~~
+    >
+    > -   ~~BMI- Average Body Mass Index of entire population~~
+    >
+    > -   ~~U-5 Deaths- Number of under-five deaths per 1000 population~~
+    >
+    > -   Polio- Polio(Pol3) immunization coverage among 1-year-olds(%)
+    >
+    > -   Total Expenditure- General government expenditure on health as a percentage of total government expenditure(%)
+    >
+    > -   Diphtheria- Diphtheria tetanus toxoid and pertussis (DTP3) immunization coverage among 1-year-olds(%)
+    >
+    > -   HIV/AIDS- Deaths per 1000 live births HIV/AIDS(0-4 years)
+    >
+    > -   ~~GDP- Gross Domestic Product per capita(in USD)~~
+    >
+    > -   Population- Population Thinness 10-19- Prevalence of thinness among children and adolescents for Age 10 to 19(%)
+    >
+    > -   Thinness 5-9- Prevalence of thinness among children for Age 5 to 9(%)
+    >
+    > -   Income Composition- Human Development Index in terms of income composition of resources(0-1)
+    >
+    >     -   filter \> 0
+    >
+    > -   Schooling- Number of years of Schooling
+    >
+    >     -   filter \> 1
+
+    </div>
+
+```{r}
+df
+```
+
+```{r fig.height=10, fig.width=10}
+pairs.panels(df)
+```
+
+```{r}
+summary(df)
+```
+
+# Data Cleaning
+
+```{r}
+df[rowSums(is.na(df))>0,]
+```
+
+### df1: Entire Data
+
+Removing records with more than 5 missing variables.
+
+```{r}
+df1 <- df[rowSums(is.na(df))<5,]
+```
+
+Removing variables without the Population Data
+
+```{r}
+df1 <- df[df$Income.composition.of.resources>0,]
+df1 <- df[df$Schooling>0,]
+df1 <- df1[!is.na(df1$Population.y),]
+df1 <- df1[!is.na(df1$Life.expectancy),]
+```
+
+Replacing NA values with the mean values for columns with less than 5% missing values.
+
+```{r}
+df1$Alcohol[is.na(df1$Alcohol)] <- mean(df$Alcohol, na.rm = TRUE)
+df1$Polio[is.na(df1$Polio)] <- mean(df$Polio, na.rm = TRUE)
+df1$Diphtheria[is.na(df1$Diphtheria)] <- mean(df$Diphtheria, na.rm = TRUE)
+df1$thinness..1.19.years[is.na(df1$thinness..1.19.years)] <- mean(df$thinness..1.19.years, na.rm = TRUE)
+df1$thinness.5.9.years[is.na(df1$thinness.5.9.years)] <- mean(df$thinness.5.9.years, na.rm = TRUE)
+df1$Schooling[is.na(df1$Schooling)] <- mean(df$Schooling, na.rm = TRUE)
+```
+
+Removing Rows with Null Values
+
+```{r}
+df1 <- df1[rowSums(is.na(df1))<1,]
+```
+
+### df2014: 2014 Data
+
+```{r}
+df2014 <- df[df$Year == 2014,]
+df2014
+```
+
+```{r}
+summary(df2014)
+```
+
+### Preparing MapData
+
+```{r}
+mapdata <- map_data("world")
+names(mapdata)[5] <- "Country"
+```
+
+```{r}
+Countries_map <- unique(mapdata["Country"])
+Countries_map["in_map"] = "map"
+Countries_map
+
+Countries_df <- unique(df2014["Country"])
+Countries_df["in_df"] = "df"
+Countries_df
+
+Countries <- merge(x = Countries_map, y = Countries_df,
+                   by = "Country", all = TRUE)
+Countries
+```
+
+```{r}
+df2014[df2014$Country == "Antigua and Barbuda", "Country"] <- "Antigua"
+df2014[df2014$Country == "Bolivia (Plurinational State of)", "Country"] <- "Bolivia"
+df2014[df2014$Country == "Brunei Darussalam", "Country"] <- "Brunei"
+df2014[df2014$Country == "CÃ´te d'Ivoire", "Country"] <- "Ivory Coast"
+df2014[df2014$Country == "Cabo Verde", "Country"] <- "Cape Verde"
+df2014[df2014$Country == "Congo", "Country"] <- "Republic of Congo"
+df2014[df2014$Country == "Czechia", "Country"] <- "Czech Republic"
+df2014[df2014$Country == "Democratic People's Republic of Korea", "Country"] <- "North Korea"
+df2014[df2014$Country == "Republic of Korea", "Country"] <- "South Korea"
+df2014[df2014$Country == "Iran (Islamic Republic of)", "Country"] <- "Iran"
+df2014[df2014$Country == "Lao People's Democratic Republic", "Country"] <- "Laos"
+df2014[df2014$Country == "Micronesia (Federated States of)", "Country"] <- "Micronesia"
+df2014[df2014$Country == "Republic of Moldova", "Country"] <- "Moldova"
+df2014[df2014$Country == "Russian Federation", "Country"] <- "Russia"
+df2014[df2014$Country == "Saint Kitts and Nevis", "Country"] <- "Saint Kitts"
+df2014[df2014$Country == "Saint Vincent and the Grenadines", "Country"] <- "Saint Vincent"
+df2014[df2014$Country == "Syrian Arab Republic", "Country"] <- "Syria"
+df2014[df2014$Country == "The former Yugoslav republic of Macedonia", "Country"] <- "Macedonia"
+df2014[df2014$Country == "Trinidad and Tobago", "Country"] <- "Trinidad"
+df2014[df2014$Country == "United Kingdom of Great Britain and Northern Ireland", "Country"] <- "UK"
+df2014[df2014$Country == "United Republic of Tanzania", "Country"] <- "Tanzania"
+df2014[df2014$Country == "United States of America", "Country"] <- "USA"
+df2014[df2014$Country == "Venezuela (Bolivarian Republic of)", "Country"] <- "Venezuela"
+df2014[df2014$Country == "Viet Nam", "Country"] <- "Vietnam"
+
+#df2014[df2014$Country == "xxxxxxxxxxxxxxxxxx", "Country"] <- "xxxxxxxxxxxxxxxxxx"
+```
+
+```{r}
+mapdata <- left_join(mapdata, df2014, by = "Country")
+```
+
+# Data Exploration
+
+## Univariate Analysis \| Understanding the Raw Data (Map Visualizations)
+
+#### Life Expectancy
+
+```{r fig.height=6, fig.width=10}
+MapLifeExpectancy <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = Life.expectancy),
+                     color = "black") +
+        labs(title = "Life Expectancy [Years]",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = 1) +
+        theme_void()
+MapLifeExpectancy
+```
+
+```{r}
+ggplot(df) +
+    aes(x = Year, y = Life.expectancy, colour = Status) +
+    geom_point(shape = "bullet", size = 0.1, alpha = 0.25) +
+    geom_smooth(span = 0.75) +
+    scale_color_brewer(palette = "Set2", direction = 1) +
+    labs(x = "Year",
+         y = "Life Expectancy [in Years]",
+         title = "Change in Life Expectancy over the Years",
+         caption = "Data Source: World Health Organization") +
+    theme_bw()
+```
+
+#### Alcohol Consumption
+
+```{r fig.height=6, fig.width=10}
+MapAlcohol <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = Alcohol),
+                     color = "black") +
+        labs(title = "Alcohol Consumption per capita [Litres of Pure Alcohol]",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = -1) +
+        theme_void()
+MapAlcohol
+```
+
+#### Polio Vaccinations
+
+```{r fig.height=6, fig.width=10}
+MapPolio <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = Polio),
+                     color = "black") +
+        labs(title = "% Polio Vaccination (Pol3) among Children",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = 1) +
+        theme_void()
+MapPolio
+```
+
+#### Total Expenditure
+
+```{r fig.height=6, fig.width=10}
+MapTotal.expenditure <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = Total.expenditure),
+                     color = "black") +
+        labs(title = "General Government Expenditure on Health \n[% of Total Govt. Expenditure]",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = 1) +
+        theme_void()
+MapTotal.expenditure
+```
+
+#### Diphtheria
+
+```{r fig.height=6, fig.width=10}
+MapDiphtheria <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = Diphtheria),
+                     color = "black") +
+        labs(title = "Diphtheria/Tetanus/Pertussis (DTP3) Immunization Coverage among Children",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = 1) +
+        theme_void()
+MapDiphtheria
+```
+
+#### HIV AIDS
+
+```{r fig.height=6, fig.width=10}
+MapHivAids <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = HIV.AIDS),
+                     color = "black") +
+        labs(title = "Deaths per 1000 live-births due to HIV/AIDS",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = -1) +
+        theme_void()
+MapHivAids
+```
+
+#### Thinness in Children
+
+```{r fig.height=6, fig.width=10}
+MapThinness <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = thinness..1.19.years),
+                     color = "black") +
+        labs(title = "% Prevalence of Thinness among Children",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = -1) +
+        theme_void()
+MapThinness
+```
+
+#### Human Development Index
+
+```{r fig.height=6, fig.width=10}
+MapHDI <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = Income.composition.of.resources),
+                     color = "black") +
+        labs(title = "Human Development Index as \nIncome Composition of Resources [0-1]",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = 1) +
+        theme_void()
+MapHDI
+```
+
+#### Schooling
+
+```{r fig.height=6, fig.width=10}
+MapSchooling <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = Schooling),
+                     color = "black") +
+        labs(title = "Schooling [No of Years]",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_distiller(palette = "Spectral", direction = 1) +
+        theme_void()
+MapSchooling
+```
+
+## Bi-variate Analysis
+
+```{r fig.height=9, fig.width=16}
+pairs.panels(df)
+```
+
+```{r}
+matrix(colnames(df))
+```
+
+### Relationship between Government Health Expenditure and Life Expectancy
+
+```{r fig.height=6, fig.width=10}
+df %>%
+    
+    ggplot() +
+    aes(x = Total.expenditure, y = Life.expectancy, colour = Status) +
+    
+    geom_point(shape = "circle", size = 1.5, alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    
+    scale_color_manual(values = c(Developed = "#1B9E77",
+                                  Developing = "#666666")) +
+    
+    labs(x = "Government Health Expenditure [% of Total Expenditure]",
+         y = "Life Expectancy [in Years]",
+         title = "Relationship between Government Health Expenditure and Life Expectancy",
+         caption = "Data Source: World Health Organization") +
+    
+    theme_bw()
+```
+
+### Relationship between Alcohol Consumption and Life Expectancy
+
+```{r fig.height=6, fig.width=10}
+df %>%
+    
+    ggplot() +
+    aes(x = Alcohol, y = Life.expectancy, colour = Status) +
+    
+    geom_point(shape = "circle", size = 1.5, alpha = 0.2) +
+    geom_smooth() +
+    
+    scale_color_manual(values = c(Developed = "#1B9E77",
+                                  Developing = "#666666")) +
+    
+    labs(x = "Alcohol Consumption per Capita [Lts. of Pure Alcohol]",
+         y = "Life Expectancy [in Years]",
+         title = "Relationship between Alcohol Consumption and Life Expectancy",
+         caption = "Data Source: World Health Organization") +
+    
+    theme_bw()
+```
+
+### Relationship between Thinness in Children and Life Expectancy
+
+```{r fig.height=6, fig.width=10}
+df %>%
+    
+    ggplot() +
+    aes(x = thinness..1.19.years, y = Life.expectancy, colour = Status) +
+    
+    geom_point(shape = "circle", size = 1.5, alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    
+    scale_color_manual(values = c(Developed = "#1B9E77",
+                                  Developing = "#666666")) +
+    
+    labs(x = "Thinness in Children [% of Population]",
+         y = "Life Expectancy [in Years]",
+         title = "Relationship between Thinness in Children and Life Expectancy",
+         caption = "Data Source: World Health Organization") +
+    
+    theme_bw()
+```
+
+### Relationship between Schooling and Life Expectancy
+
+```{r fig.height=6, fig.width=10}
+df %>%
+    filter(Schooling >= 0.1 | is.na(Schooling)) %>%
+    
+    ggplot() +
+    aes(x = Schooling, y = Life.expectancy, colour = Status) +
+    
+    geom_point(shape = "circle", size = 1.5, alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    
+    scale_color_manual(values = c(Developed = "#1B9E77",
+                                  Developing = "#666666")) +
+    
+    labs(x = "Schooling [in Years]",
+         y = "Life Expectancy [in Years]",
+         title = "Relationship between Schooling and Life Expectancy",
+         caption = "Data Source: World Health Organization") +
+    
+    theme_bw()
+```
+
+### Relationship between Schooling and Human Development Index
+
+```{r fig.height=6, fig.width=10}
+df %>%
+    filter(Schooling >= 0.1 | is.na(Schooling)) %>%
+    filter(Income.composition.of.resources >= 0.1 | is.na(Income.composition.of.resources)) %>%
+    
+    ggplot() +
+    aes(x = Schooling, y = Income.composition.of.resources, colour = Status) +
+    
+    geom_point(shape = "circle", size = 1.5, alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    
+    scale_color_manual(values = c(Developed = "#1B9E77",
+                                  Developing = "#666666")) +
+    
+    labs(x = "Schooling [in Years]",
+         y = "Human Development Index [0-1]",
+         title = "Relationship between Schooling and Human Development Index",
+         caption = "Data Source: World Health Organization") +
+    
+    theme_bw()
+```
+
+### Relationship between Vaccinations and Life Expectancy
+
+```{r fig.height=6, fig.width=10}
+df %>%
+    filter(Polio >= 10 | is.na(Polio)) %>%
+    
+    ggplot() +
+    aes(x = Polio, y = Life.expectancy, colour = Status) +
+    
+    geom_point(shape = "circle", size = 1.5, alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    
+    scale_color_manual(values = c(Developed = "#1B9E77",
+                                  Developing = "#666666")) +
+    
+    labs(x = "Polio Vaccination [% of Children]",
+         y = "Life Expectancy [in Years]",
+         title = "Relationship between Polio Vaccination and Life Expectancy",
+         caption = "Data Source: World Health Organization") +
+    
+    theme_bw()
+```
+
+```{r fig.height=6, fig.width=10}
+df %>%
+    filter(Diphtheria >= 10 | is.na(Diphtheria)) %>%
+    
+    ggplot() +
+    aes(x = Diphtheria, y = Life.expectancy, colour = Status) +
+    
+    geom_point(shape = "circle", size = 1.5, alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    
+    scale_color_manual(values = c(Developed = "#1B9E77",
+                                  Developing = "#666666")) +
+    
+    labs(x = "Diphtheria Vaccination [% of Children]",
+         y = "Life Expectancy [in Years]",
+         title = "Relationship between Diphtheria Vaccination and Life Expectancy",
+         caption = "Data Source: World Health Organization") +
+    
+    theme_bw()
+```
+
+## Data Clusters
+
+#### Creating Clusters
+
+```{r}
+df2014_trim <- df2014[rowSums(is.na(df2014)) == 0,]
+```
+
+```{r}
+k = 4
+km <- kmeans(df2014_trim[,c(4,6,8,9,13)], centers=k)
+
+df2014_trim$cluster <- as.factor(km$cluster)
+
+autoplot(km, df2014_trim[,4:14], frame = TRUE)
+```
+
+#### Preparing MapData
+
+```{r}
+mapdata <- map_data("world")
+names(mapdata)[5] <- "Country"
+```
+
+```{r}
+mapdata <- left_join(mapdata, df2014_trim, by = "Country")
+```
+
+#### Mapping Clusters
+
+```{r}
+MapClusters <- ggplot(data = mapdata,
+               aes(x = long, y = lat, group = group)) +
+        geom_polygon(aes(fill = cluster),
+                     color = "black") +
+        labs(title = "Clustering Health Data",
+            caption=c('Data Source: World Health Organization')) +
+        scale_fill_brewer(name = "Clusters", palette = "Pastel2") +
+        theme_void()
+MapClusters
+```
+
+```{r}
+print("Done...")
+```

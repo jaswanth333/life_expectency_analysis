@@ -1,0 +1,153 @@
+---
+title: "FinalProject"
+author: "Sai Jaswanth Kumar Kunku"
+date: "12/10/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Libraries
+```{r,results='hide'}
+library(tidyverse)
+library(psych)
+library(ggcorrplot)
+library(plotly)
+library(leaps)
+library(caret)
+library(reshape2)    
+```
+#Data
+```{r}
+df <- read.csv(file = "finaldata2.csv")
+summary(df)
+main_data=subset(df, select=-c(Country,Status,Year))
+```
+
+## Including Plots
+
+```{r pressure, echo=FALSE}
+boxrep = par(c(2, 1, 0, 3), nrow = 2, ncol = 2)
+
+for ( i in 1:19 ) {
+  
+  boxplot(as.numeric(main_data[[i]]),col='lightblue')
+  mtext(names(main_data)[i], cex = 0.8, side = 1, line = 2)
+}
+
+dev.off()
+graphics.off()
+#pairs.panels(main_data)
+
+
+#Avg life expect
+df %>% group_by(Status) %>%  summarise_at(vars(Life.expectancy), list(Life.expectancy = mean)) %>%
+  ggplot(aes(x=Status,y=Life.expectancy))+
+  geom_bar(aes(fill=Status),stat='identity')+labs(title="Average Life Expectancy of countries")
+
+
+#Top 10 countries with lowest life expectancy
+df %>% group_by(Country) %>%  
+  summarise_at(vars(Life.expectancy), list(Life.expectancy = mean)) %>% 
+  filter(rank((Life.expectancy))<=10) %>%
+  mutate(Country = fct_reorder(Country, Life.expectancy)) %>%
+  ggplot(aes(x=Country,y=Life.expectancy))+
+  geom_bar(aes(fill=Country),stat='identity')+labs(title="Top 10 countries with Lowest Life expectancy")
+
+
+
+#Top 5 countries with highest life expectancy 
+df %>% group_by(Country) %>%  
+  summarise_at(vars(Life.expectancy), list(Life.expectancy = mean)) %>% 
+  filter(rank(desc(Life.expectancy))<=10) %>%
+  mutate(Country = fct_reorder(Country, desc(Life.expectancy))) %>%
+  ggplot(aes(x=Country,y=Life.expectancy))+
+  geom_bar(aes(fill=Country),stat='identity')+
+  labs(title="Top 10 countries with Highest Life expectancy")
+
+#Checking avg life expectancy of developing and developed
+
+df %>% group_by(Year,Status) %>%  
+  summarise_at(vars(Life.expectancy),list(Life.expectancy = mean)) %>%
+ggplot(aes(x=Year, y=Life.expectancy, group=Status,color=Status)) + 
+  labs(title = "Average Life Expectancy(2010-2015)")+
+  geom_line()+geom_smooth(method=lm)+theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  facet_wrap(~ Status)
+
+```
+
+```{r}
+ggcorrplot(cor(main_data), hc.order = TRUE,show.diag = FALSE,type="lower",lab=TRUE,insig = "blank",digits = 2,lab_size=3,colors= c("#6D9EC1", "white", "#E46726"))+ 
+  labs(title = "Correlation Matrix")
+
+pairs.panels(main_data)
+```
+
+#Linear Model
+```{r}
+full.model <- lm(Life.expectancy ~., data = main_data)
+summary(full.model)
+```
+
+#BestSubset Selection
+```{r}
+regfit.full=regsubsets(Life.expectancy~.,main_data,nvmax=18)
+reg.summary = summary(regfit.full)
+which.min(reg.summary$rss) 
+which.max(reg.summary$adjr2)
+which.min(reg.summary$cp)
+which.min(reg.summary$bic)
+coef(regfit.full,8)
+fit2 = lm(Life.expectancy~Adult.Mortality+percentage.expenditure+Alcohol+under.five.deaths+Diphtheria+HIV.AIDS+Income.composition.of.resources+Population.y,main_data)
+summary(fit2)
+```
+```{r}
+library(sandwich)
+coeftest(fit2, vcov = vcovHC(fit2, "HC1"))
+
+
+summary(fit2)
+
+
+anova(full.model,fit2)
+
+```
+
+#Test/Train Split and fitting model 2
+```{r}
+set.seed(1)
+sample=sample(1:nrow(main_data),size=nrow(main_data)*.8)
+train<-main_data[sample,] #Select the 80% of rows
+test<-main_data[-sample,] #Select the 20% of rows
+predicted=predict(fit2,test,type="response")
+actuals_preds <- data.frame(cbind(actuals=test$Life.expectancy, predicteds=predicted))
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))
+R2 = R2(predicted, test$Life.expectancy)
+print(paste("R2 Error Rate: " ,R2))
+print(paste("Error Rate: " ,RMSE(predicted, test$Life.expectancy)))
+print(paste("Accuracy: " ,min_max_accuracy*100))
+```
+```{r}
+# Define training control
+train.control <- trainControl(method = "LOOCV")
+# Train the model
+model <- train(Life.expectancy~Adult.Mortality+Alcohol+percentage.expenditure+Diphtheria+HIV.AIDS+Income.composition.of.resources, data = main_data, method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+```
+
+#10 Fold CV
+
+```{r}
+# Define training control
+set.seed(123) 
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+model <- train(Life.expectancy~Adult.Mortality+Alcohol+percentage.expenditure+Diphtheria+HIV.AIDS+Income.composition.of.resources, data = main_data, method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+```
+
